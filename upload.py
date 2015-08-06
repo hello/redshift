@@ -17,10 +17,21 @@ from boto.dynamodb2.table import Table
 DYNAMODB_TABLE = 'redshift_log'
 S3_MAIN_BUCKET = "hello-db-exports"
 MAX_LINES = 100000000
+CHUNK_SIZE = 1000000 # testing  5000000 # lines
+
+ERROR_NOT_FOUND = 'File in S3 bucket, but not in local drive'
+ERROR_CHECKSUM = "Checksum do not match"
+
+# terminal colors
+GREEN = '\033[92m'
+ENDC = '\033[0m'
+BLUE = '\033[94m'
+BOLD = '\033[1m'
 
 logging.basicConfig(level=logging.DEBUG)
 logging.getLogger('boto').setLevel(logging.ERROR)
 
+logging.debug("\n\nStart %s", str(datetime.now()))
 
 # python upload.py device_sensors_2015_02 device_sensors_par_2015_02
 # device_sensors 0 device_sensors_2015_02 yes no
@@ -44,22 +55,24 @@ if not os.path.isdir(folder):
 
 # 1. Get data from DB
 if get_db == 'yes':
+    logging.debug("\n\nGetting data from RDS table %s", table_name)
     os.system("get_data.sh %s %s %s %s" % (table_name, prefix, folder, offset_arg))
 
 # check if file exist
 gzip_datafile = "%s.csv.gz" % prefix
 datafile = "%s/%s.csv" % (folder, prefix)
+logging.debug("\n\nCheck if datafile %s exist", datafile)
 if not os.path.isfile(datafile):
     logging.error("Data not downloaded to %s", datafile)
     logging.debug("exiting....")
-    # sys.exit()
+    sys.exit()
         
 
 # 2. split data into smaller chunks
+logging.debug("\n\nSplit data into files of size %s", CHUNK_SIZE)
 file_info = {}
 num_lines = 0
 if do_split == 'yes':
-    CHUNK_SIZE = 100000 # testing  5000000 # lines
     num = 0
     with open(datafile) as fp:
         added = 0
@@ -67,9 +80,11 @@ if do_split == 'yes':
             if added == 0:
                 splitfile = "%s-0%d" % (prefix, num)
                 if num < 10:
-                    splitfile = "%s-00%d" % (prefix, num)
+                    splitfile = "%s-000%d" % (prefix, num)
                 elif num < 100:
-                    splitfile = "%s-0%d" % (prefix, num)
+                    splitfile = "%s-00%d" % (prefix, num)
+                elif num < 1000:
+                    splitfile = "%s-00%d" % (prefix, num)
 
                 split_fp = open("%s/%s" % (folder, splitfile), 'w')
 
@@ -101,7 +116,10 @@ file_info[gzip_datafile]['created'] = datetime.strftime(
 
 
 # 3. upload to S3
-onlyfiles = [ f for f in os.listdir(folder) if os.path.isfile(os.path.join(folder,f)) ]
+logging.debug("\n\nPreparing to upload to S3 %s/%s", S3_MAIN_BUCKET, bucket_name)
+
+onlyfiles = [ f for f in os.listdir(folder)
+            if os.path.isfile(os.path.join(folder,f)) ]
 
 aws_key = os.getenv("AWS_ACCESS_KEY_ID")
 aws_secret = os.getenv("AWS_SECRET_ACCESS_KEY")
@@ -127,9 +145,10 @@ for org_filename in onlyfiles:
     aws_md5 = Key.get_md5_from_hexdigest(k, file_md5)
     logging.debug("md5: %s, %r", file_md5, aws_md5)
 
-    #k.set_contents_from_filename("%s/%s" % (folder, filename), md5=aws_md5)
+    k.set_contents_from_filename("%s/%s" % (folder, filename), md5=aws_md5)
 
 # 4. check md5 checksum and save to dynamoDB
+logging.debug("\n\nChecking MD5 checksums of uploaded files")
 rs_keys = bucket.get_all_keys()
 num_files_uploaded = len(file_info)
 
@@ -160,7 +179,7 @@ for key_val in rs_keys:
     d_item['uploaded_s3'] = True
 
     if filename not in file_info:
-        logging.error("file %s not found!!", filename)
+        logging.error("file %s not found!! key %r", filename, key_val.key)
         not_found_errors += 1
         d_item['errors'] = ERROR_NOT_FOUND
         logging.debug("dynamo item: %r", d_item)
@@ -199,6 +218,7 @@ logging.debug("Errors-checksum: %d", num_errors)
 
 # create manifest file
 # manifest file format
+logging.debug("\n\nCreate manifest file")
 manifest = """
 {
   "entries": [
@@ -238,12 +258,14 @@ k.set_contents_from_filename("%s/%s" % (folder, manifest_file), md5=aws_md5)
 
 
 # set up COPY command to import from S3 to Redshift
+logging.debug("\n\nPreparing to COPY data to Redshift")
 redshift_pw = os.getenv("PGPASSWORD")
 
 logging.debug("command line to copy data")
-redshift_psql = "psql -h sensors2.cy7n0vzxfedi.us-east-1.redshift.amazonaws.com -U hello_sensors2 -p 5439 -d sensors1 << EOF"
+redshift_psql = "psql -h sensors2.cy7n0vzxfedi.us-east-1.redshift.amazonaws.com -U migrator -p 5439 -d sensors1 << EOF"
 redshift_copy = "COPY device_sensors_master from 's3://hello-db-exports/%s/%s.manifest' credentials 'aws_access_key_id=%s;aws_secret_access_key=%s' delimiter ',' gzip manifest;" % (bucket_name, prefix, aws_key, aws_secret)
 
+# create copy script
 copy_filename = "Copy/copy_%s.sh" % prefix
 filep = open(copy_filename, "w")
 filep.write("#!/bin/bash" + "\n")
@@ -254,12 +276,9 @@ filep.close()
 os.system("chmod +x %s" % copy_filename)
 logging.debug("Executing %s", redshift_copy)
 
-ENDC = '\033[0m'
-OKBLUE = '\033[94m'
-BOLD = '\033[1m'
-
-
-okay = raw_input("\n\n" + OKBLUE + BOLD +"Okay to proceed with Redshift COPY?(Y/n)" + ENDC)
+okay = raw_input("\n\n" + GREEN + BOLD +"Okay to proceed with Redshift COPY?(Y/n)" + ENDC)
 if okay == 'Y':
     logging.debug("Executing %s", redshift_copy)
     os.system("./%s" % (copy_filename))
+
+logging.debug("\n\nDone %s", str(datetime.now()))
