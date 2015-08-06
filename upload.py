@@ -1,6 +1,7 @@
 import os
 import sys
 
+from datetime import datetime
 import json
 import gzip
 import hashlib
@@ -10,15 +11,23 @@ import boto
 from boto.s3.connection import S3Connection
 from boto.s3.key import Key
 
+import boto.dynamodb2
+from boto.dynamodb2.table import Table
+
+DYNAMODB_TABLE = 'redshift_log'
 S3_MAIN_BUCKET = "hello-db-exports"
 MAX_LINES = 100000000
 
 logging.basicConfig(level=logging.DEBUG)
+logging.getLogger('boto').setLevel(logging.ERROR)
+
 
 # python upload.py device_sensors_2015_02 device_sensors_par_2015_02
 # device_sensors 0 device_sensors_2015_02 yes no
 if len(sys.argv) != 8:
-    print "Usage: python upload.py [table_name] [prefix] [folder] [offset] [bucket_name] [skip_db=yes/no] [skip_split]\n\n"
+    print "Usage: python upload.py [table_name] [prefix] [folder] [offset] [bucket_name] [get_db] [do_split]\n\n"
+    print "get_db: yes/no"
+    print "do_split: yes/no"
     sys.exit()
 
 table_name = sys.argv[1]
@@ -26,15 +35,15 @@ prefix = sys.argv[2]
 folder = sys.argv[3]
 offset_arg = sys.argv[4]
 bucket_name = sys.argv[5]
-skip_db_step = sys.argv[6]
-skip_split = sys.argv[7]
+get_db = sys.argv[6]
+do_split = sys.argv[7]
 
 if not os.path.isdir(folder):
     logging.debug("Creating folder for data: %s", folder)
     os.makedirs(folder)
 
 # 1. Get data from DB
-if skip_db_step == 'no':
+if get_db == 'yes':
     os.system("get_data.sh %s %s %s %s" % (table_name, prefix, folder, offset_arg))
 
 # check if file exist
@@ -43,12 +52,13 @@ datafile = "%s/%s.csv" % (folder, prefix)
 if not os.path.isfile(datafile):
     logging.error("Data not downloaded to %s", datafile)
     logging.debug("exiting....")
-    sys.exit()
+    # sys.exit()
         
 
 # 2. split data into smaller chunks
+file_info = {}
 num_lines = 0
-if skip_split == 'no':
+if do_split == 'yes':
     CHUNK_SIZE = 100000 # testing  5000000 # lines
     num = 0
     with open(datafile) as fp:
@@ -68,14 +78,29 @@ if skip_split == 'no':
             added += 1
 
             if added >= CHUNK_SIZE:
+                logging.debug("split file %s: %d", splitfile, added)
                 split_fp.close()
+                file_info.setdefault(splitfile + ".gz", {})
+                file_info[splitfile + ".gz"]['size'] = added
+                file_info[splitfile + ".gz"]['created'] = datetime.strftime(
+                        datetime.now(), "%Y-%m-%d %H:%M:%S")
                 added = 0
                 num += 1
 
     split_fp.close()
+    logging.debug("split file %s: %d", splitfile, added)
+    file_info.setdefault(splitfile + ".gz", {})
+    file_info[splitfile + ".gz"]['size'] = added
+    file_info[splitfile + ".gz"]['created'] = datetime.strftime(
+            datetime.now(), "%Y-%m-%d %H:%M:%S")
+
+file_info[gzip_datafile] = {}
+file_info[gzip_datafile]['size'] = num_lines
+file_info[gzip_datafile]['created'] = datetime.strftime(
+        datetime.now(), "%Y-%m-%d %H:%M:%S")
 
 
-# upload to S3
+# 3. upload to S3
 onlyfiles = [ f for f in os.listdir(folder) if os.path.isfile(os.path.join(folder,f)) ]
 
 aws_key = os.getenv("AWS_ACCESS_KEY_ID")
@@ -84,7 +109,6 @@ aws_secret = os.getenv("AWS_SECRET_ACCESS_KEY")
 conn = S3Connection(aws_key, aws_secret)
 bucket = conn.get_bucket(S3_MAIN_BUCKET)
 
-file_md5_dict = {}
 for org_filename in onlyfiles:
     cmd = "gzip %s/%s" % (folder, org_filename)
     logging.debug(cmd)
@@ -95,39 +119,74 @@ for org_filename in onlyfiles:
     k = Key(bucket)
     k.key = "%s/%s" % (bucket_name, filename)
 
-
-    # multipart upload
-    # chunk_size = 1024 # 52428800   # 50MB chunks
-    # mp = bucket.initiate_multipart_upload(filename)
-
+    # get md5 checksum for verification
     file_md5 = hashlib.md5(open("%s/%s" % (folder, filename), 'rb').read()).hexdigest()
-    file_md5_dict[filename] = file_md5
+    file_info.setdefault(filename, {})
+    file_info[filename]['checksum'] = file_md5
 
     aws_md5 = Key.get_md5_from_hexdigest(k, file_md5)
     logging.debug("md5: %s, %r", file_md5, aws_md5)
 
-    k.set_contents_from_filename("%s/%s" % (folder, filename), md5=aws_md5)
+    #k.set_contents_from_filename("%s/%s" % (folder, filename), md5=aws_md5)
 
-# Check md5 checksum
+# 4. check md5 checksum and save to dynamoDB
 rs_keys = bucket.get_all_keys()
-num_files_uploaded = len(file_md5_dict)
+num_files_uploaded = len(file_info)
 
 num_errors = 0
 not_found_errors = 0
+dynamo_table = Table('redshift_log')
+dynamo_generic_item = {'filename': 'none',
+    'size': 0,
+    'created': str(datetime.now()),
+    'uploaded_s3': False,
+    'added_manifest': False,
+}
+
+ERROR_NOT_FOUND = 'File in S3 bucket, but not in local drive'
+ERROR_CHECKSUM = "Checksum do not match"
+
 for key_val in rs_keys:
     if bucket_name not in key_val.key:
         continue
+
     filename = key_val.key.split("/")[-1]
-    if filename not in file_md5_dict:
-        logging.error("file %s not found!!", filename)
-        not_found_errors += 1
+    if not filename:
+        logging.error("Empty filename %r", key_val.key)
         continue
 
-    checksum = key_val.etag.strip('"')
-    if file_md5_dict[filename] != checksum:
+    d_item = dict(dynamo_generic_item)
+    d_item['filename'] = filename
+    d_item['uploaded_s3'] = True
+
+    if filename not in file_info:
+        logging.error("file %s not found!!", filename)
+        not_found_errors += 1
+        d_item['errors'] = ERROR_NOT_FOUND
+        logging.debug("dynamo item: %r", d_item)
+        dynamo_table.put_item(data=d_item)
+        continue
+
+    # checksum
+    logging.debug("info for file %s: %r", filename, file_info[filename])
+    d_item['size'] = file_info[filename]['size']
+    d_item['created'] = file_info[filename]['created']
+
+    local_checksum = file_info[filename]['checksum']
+    d_item['local_checksum'] = local_checksum
+
+    s3_checksum = key_val.etag.strip('"')
+    d_item['s3_checksum'] = s3_checksum
+
+    if local_checksum != s3_checksum:
         logging.error("checksum error! file: %s, checksum: %s, etag: %s",
-                filename, file_md5_dict[filename], checksum)
+                filename, local_checksum, s3_checksum)
         num_errors += 1
+        d_item['errors'] = ERROR_CHECKSUM
+
+    logging.debug("dynamo item: %r", d_item)
+    dynamo_table.put_item(data=d_item)
+
 
 
 logging.debug("Summary for %s", prefix)
@@ -136,8 +195,6 @@ logging.debug("Number of splitted files: %d", len(onlyfiles))
 logging.debug("Number of files uploaded: %d", num_files_uploaded)
 logging.debug("Errors-not-found: %d", not_found_errors)
 logging.debug("Errors-checksum: %d", num_errors)
-
-# save checksum in dynamo
 
 
 # create manifest file
@@ -152,7 +209,7 @@ manifest = """
 }
 """
 entries = []
-for filename in file_md5_dict:
+for filename in file_info:
     if filename == gzip_datafile:
         logging.debug("do not add original file %s to manifest", datafile)
         continue
@@ -160,6 +217,10 @@ for filename in file_md5_dict:
     logging.debug("adding to manifest: %s", filename)
     entries.append({"url": "s3://%s/%s/%s" % (S3_MAIN_BUCKET, bucket_name, filename),
         "mandatory": True})
+    d_item = dynamo_table.get_item(filename=filename)
+    d_item['added_manifest'] = True
+    d_item.partial_save()
+
 
 manifest_data = {"entries": entries}
 manifest_file = "%s.manifest" % prefix
@@ -175,11 +236,13 @@ file_md5 = hashlib.md5(open("%s/%s" % (folder, manifest_file), 'rb').read()).hex
 aws_md5 = Key.get_md5_from_hexdigest(k, file_md5)
 k.set_contents_from_filename("%s/%s" % (folder, manifest_file), md5=aws_md5)
 
+
+# set up COPY command to import from S3 to Redshift
 redshift_pw = os.getenv("PGPASSWORD")
 
 logging.debug("command line to copy data")
 redshift_psql = "psql -h sensors2.cy7n0vzxfedi.us-east-1.redshift.amazonaws.com -U hello_sensors2 -p 5439 -d sensors1 << EOF"
-redshift_copy = "copy device_sensors_master from 's3://hello-db-exports/%s/%s.manifest' credentials 'aws_access_key_id=%s;aws_secret_access_key=%s' delimiter ',' gzip manifest;" % (bucket_name, prefix, aws_key, aws_secret)
+redshift_copy = "COPY device_sensors_master from 's3://hello-db-exports/%s/%s.manifest' credentials 'aws_access_key_id=%s;aws_secret_access_key=%s' delimiter ',' gzip manifest;" % (bucket_name, prefix, aws_key, aws_secret)
 
 copy_filename = "Copy/copy_%s.sh" % prefix
 filep = open(copy_filename, "w")
@@ -189,5 +252,14 @@ filep.write(redshift_copy + "\n")
 filep.write("EOF")
 filep.close()
 os.system("chmod +x %s" % copy_filename)
-logging.debug("%s", redshift_copy)
+logging.debug("Executing %s", redshift_copy)
 
+ENDC = '\033[0m'
+OKBLUE = '\033[94m'
+BOLD = '\033[1m'
+
+
+okay = raw_input("\n\n" + OKBLUE + BOLD +"Okay to proceed with Redshift COPY?(Y/n)" + ENDC)
+if okay == 'Y':
+    logging.debug("Executing %s", redshift_copy)
+    os.system("./%s" % (copy_filename))
