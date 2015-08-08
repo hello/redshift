@@ -40,9 +40,12 @@ dbname="sensors1"
 username="sensors"
 hostname="sensros-1-replica-2.cdawj8qazvva.us-east-1.rds.amazonaws.com"
 
+offset_tables="\COPY (SELECT * FROM ${tablename} LIMIT ${limit} OFFSET ${offset}) TO '${folder}/${datafile}' DELIMITER ',' CSV"
+monthly_tables="\COPY (SELECT * FROM ${tablename}) TO '${folder}/${datafile}' DELIMITER ',' CSV"
+
 echo "-- Get data for $datafile from database $dbname"
 printf "${BLUE}"
 psql -h $hostname $dbname -U $username << EOF
-\COPY (SELECT * FROM ${tablename} LIMIT ${limit} OFFSET ${offset}) TO '${folder}/${datafile}' DELIMITER ',' CSV
+ ${monthly_tables}
 EOF
 printf "${NC}"
