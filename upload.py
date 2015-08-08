@@ -46,14 +46,32 @@ def main(args):
         logging.error("Please set credentials and password env")
         return
 
-    table_name = args[1]
-    redshift_table = args[2]
-    prefix = args[3]
-    folder = args[4]
+    # table_name = args[1]
+    # redshift_table = args[2]
+    # prefix = args[3]
+    # folder = args[4]
+    # offset_arg = args[5]
+    # bucket_name = args[6]
+    # get_db = args[7]
+    # do_split = args[8]
+
+    table_prefix = args[1]
+    year = args[2]
+    month = args[3]
+    day = args[4]
     offset_arg = args[5]
-    bucket_name = args[6]
-    get_db = args[7]
-    do_split = args[8]
+    get_db = args[6]
+    do_split = args[7]
+
+    date = "%s_%s_%s" % (year, month, day)
+    yy_mm = "%s_%s" % (year, month)
+
+    table_name = "%s_%s" % (table_prefix, date)
+    redshift_table = "%s_%s" % (table_prefix, yy_mm)
+    prefix = "%s_%s" % (table_prefix, date) 
+    folder = "%s_%s" % (table_prefix, date)
+    bucket_name = "%s_%s" % (table_prefix, yy_mm)
+
 
     if not os.path.isdir(folder):
         logging.debug("Creating folder for data: %s", folder)
@@ -199,7 +217,8 @@ def main(args):
     }
 
     for key_val in rs_keys:
-        if bucket_name not in key_val.key:
+        if bucket_name not in key_val.key or \
+            prefix not in key_val.key:
             continue
 
         filename = key_val.key.split("/")[-1]
@@ -214,7 +233,7 @@ def main(args):
         if filename not in file_info:
             logging.error("file %s not found!! key %r", filename, key_val.key)
             not_found_errors += 1
-            d_item['errors'] = ERROR_NOT_FOUND
+            continue
         else:
             # checksum
             logging.debug("check info for file %s: %r",
@@ -338,9 +357,18 @@ def main(args):
 if __name__ == "__main__":
     # python upload.py device_sensors_2015_02 device_sensors_par_2015_02
     # device_sensors 0 device_sensors_2015_02 yes no
-    if len(sys.argv) != 9:
-        print "Usage: python upload.py [rds_table_name] [rs_tablename] " + \
-            "[prefix] [folder] [offset] [bucket_name] [get_db] [do_split]\n\n"
+    comments = """
+    prev
+    python upload.py device_sensors_par_2015_07_08 device_sensors_par_2015_07 device_sensors_par_2015_07_08 device_sensors_2015_07_08 0 device_sensors_2015_08 yes yes
+
+    python upload.py device_sensors_par 2015 07 08 0 yes yes
+    [table_prefix] [year] [month] [day] [offset] [get_db] [do_split]
+    """
+    if len(sys.argv) != 8:
+        # print "Usage: python upload.py [rds_table_name] [rs_tablename] " + \
+        #     "[prefix] [folder] [offset] [bucket_name] [get_db] [do_split]\n\n"
+        print "Usage: python upload.py [table_prefix] [YYYY] [MM] [DD] " + \
+                "[offset] [get_db] [do_split]\n\n"
         print "get_db: yes/no"
         print "do_split: yes/no"
         sys.exit()
