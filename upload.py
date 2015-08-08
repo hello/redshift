@@ -60,17 +60,31 @@ def main(args):
         os.makedirs(folder)
 
     # 1. Get data from DB
+    datafile = "%s/%s.csv" % (folder, prefix)
     if get_db == 'yes':
         start_ts = int(time.time())
         logging.debug("\n\nGetting data from RDS table %s", table_name)
-        os.system("get_data.sh %s %s %s %s" % (
+        os.system("./get_data.sh %s %s %s %s" % (
                 table_name, prefix, folder, offset_arg))
         lapse = int(time.time()) - start_ts
         logging.debug("get data time taken: %d", lapse)
 
+        logging.debug("check table size")
+        lines = open("%s.count" % table_name).read().split("\n")
+        line_count = int(lines[0].split()[0])
+
+        os.system("./get_count.sh %s" % (table_name))
+        lines = open("%s.rds_count" % table_name).read().split("\n")
+        rds_line_count = int(lines[0].split()[0])
+        if rds_line_count != line_count:
+            logging.error("Downloaded file %s has insufficient data")
+            sys.exit()
+        else:
+            logging.debug("line counts matches %d", line_count)
+
+
     # check if file exist
     gzip_datafile = "%s.csv.gz" % prefix
-    datafile = "%s/%s.csv" % (folder, prefix)
     logging.debug("\n\nCheck if datafile %s exist", datafile)
     if not os.path.isfile(datafile):
         logging.error("Data not downloaded to %s", datafile)
@@ -305,8 +319,10 @@ def main(args):
     logging.debug("COPY command: %s", copy_cmd)
 
 
-    okay = raw_input("\n\n" + GREEN + BOLD + "Review manifest and command\n" +
-        "Okay to proceed with Redshift COPY?(Y/n)" + ENDC)
+    # okay = raw_input("\n\n" + GREEN + BOLD + "Review manifest and command\n" +
+    #     "Okay to proceed with Redshift COPY?(Y/n)" + ENDC)
+
+    okay = 'Y'
 
     if okay == 'Y':
         logging.debug("Executing COPY command")
@@ -322,7 +338,7 @@ def main(args):
 if __name__ == "__main__":
     # python upload.py device_sensors_2015_02 device_sensors_par_2015_02
     # device_sensors 0 device_sensors_2015_02 yes no
-    if len(sys.argv) != 8:
+    if len(sys.argv) != 9:
         print "Usage: python upload.py [rds_table_name] [rs_tablename] " + \
             "[prefix] [folder] [offset] [bucket_name] [get_db] [do_split]\n\n"
         print "get_db: yes/no"
