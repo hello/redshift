@@ -18,6 +18,7 @@ logging.getLogger('boto').setLevel(logging.ERROR)
 from boto.s3.connection import S3Connection
 from boto.s3.key import Key
 
+import boto
 from boto.dynamodb2.table import Table
 from boto.dynamodb2.items import Item
 
@@ -70,7 +71,7 @@ def main(args):
     redshift_table = "%s_%s" % (table_prefix, yy_mm)
     prefix = "%s_%s" % (table_prefix, date) 
     folder = "%s_%s" % (table_prefix, date)
-    bucket_name = "%s_%s" % (table_prefix, yy_mm)
+    bucket_name = "device_sensors_%s/%s" % (yy_mm, date)
 
 
     if not os.path.isdir(folder):
@@ -162,8 +163,8 @@ def main(args):
 
 
     # 3. upload to S3
-    logging.debug("\n\nPreparing to upload to S3 %s/%s",
-                S3_MAIN_BUCKET, bucket_name)
+    logging.debug("\n\nPreparing to upload to S3 %s/%s/%s",
+                S3_MAIN_BUCKET, bucket_name, date)
 
     start_ts = int(time.time())
     onlyfiles = [ f for f in os.listdir(folder)
@@ -203,7 +204,7 @@ def main(args):
     # 4. check md5 checksum and save to dynamoDB
     logging.debug("\n\nChecking MD5 checksums of uploaded files")
     start_ts = int(time.time())
-    rs_keys = bucket.get_all_keys()
+    rs_keys = bucket.list(bucket_name)
     num_files_uploaded = len(file_info)
 
     num_errors = 0
@@ -217,8 +218,7 @@ def main(args):
     }
 
     for key_val in rs_keys:
-        if bucket_name not in key_val.key or \
-            prefix not in key_val.key:
+        if bucket_name not in key_val.key:
             continue
 
         filename = key_val.key.split("/")[-1]
@@ -284,6 +284,7 @@ def main(args):
             logging.debug("do not add original file %s to manifest", datafile)
             continue
 
+        logging.debug("check file %s", filename)
         try:
             d_item = dynamo_table.get_item(filename=filename)
         except boto.dynamodb2.exceptions.ItemNotFound, e:

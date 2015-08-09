@@ -11,7 +11,7 @@ NO_BG='\033[0;49m'
 args=$#           # Number of args passed.
 if [ $args -ne 1 ]
 then
-    echo "Migrate data from Postgres to S3"
+    echo "Get row count of a table"
     echo "Usage: ./get_count.sh [DB-tablename]"
     echo
     exit
@@ -32,7 +32,7 @@ hostname="sensors-2-replica-1.cdawj8qazvva.us-east-1.rds.amazonaws.com"
 
 db_query="\COPY (SELECT count(1) FROM ${tablename}) TO '${tablename}.rds_count' DELIMITER ',' CSV"
 
-echo "-- Get data for $datafile from database $dbname"
+echo "-- Get row count for table $tablename"
 printf "${BLUE}"
 psql -h $hostname $dbname -U $username -W<< EOF
  ${db_query}
