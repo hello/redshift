@@ -46,7 +46,7 @@ monthly_tables="\COPY ${tablename} TO '${folder}/${datafile}' DELIMITER ',' CSV"
 
 echo "-- Get data for $datafile from database $dbname"
 printf "${BLUE}"
-psql -h $hostname $dbname -U $username -W<< EOF
+psql -h $hostname $dbname -U $username << EOF
  ${monthly_tables}
 EOF
 printf "${NC}"

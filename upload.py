@@ -42,7 +42,7 @@ BOLD = '\033[1m'
 def main(args):
     logging.debug("\n\nStart %s", str(datetime.now()))
 
-    if not os.getenv("PGPASSWORD") or not os.getenv("aws_secret_access_key") \
+    if not os.getenv("aws_secret_access_key") \
         or not os.getenv("aws_access_key_id"):
         logging.error("Please set credentials and password env")
         return

@@ -34,7 +34,7 @@ db_query="\COPY (SELECT count(1) FROM ${tablename}) TO '${tablename}.rds_count' 
 
 echo "-- Get row count for table $tablename"
 printf "${BLUE}"
-psql -h $hostname $dbname -U $username -W<< EOF
+psql -h $hostname $dbname -U $username << EOF
  ${db_query}
 EOF
 printf "${NC}"
