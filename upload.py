@@ -42,59 +42,73 @@ BOLD = '\033[1m'
 def main(args):
     logging.debug("\n\nStart %s", str(datetime.now()))
 
-    if not os.getenv("aws_secret_access_key") \
-        or not os.getenv("aws_access_key_id"):
+    if not os.getenv("aws_secret_access_key") or \
+        not os.getenv("aws_access_key_id"):
         logging.error("Please set credentials and password env")
         return
-
-    # table_name = args[1]
-    # redshift_table = args[2]
-    # prefix = args[3]
-    # folder = args[4]
-    # offset_arg = args[5]
-    # bucket_name = args[6]
-    # get_db = args[7]
-    # do_split = args[8]
 
     table_prefix = args[1]
     year = args[2]
     month = args[3]
     day = args[4]
-    offset_arg = args[5]
-    get_db = args[6]
-    do_split = args[7]
+    get_db = args[5]
+    do_split = args[6]
 
-    date = "%s_%s_%s" % (year, month, day)
     yy_mm = "%s_%s" % (year, month)
+    date = "%s_%s_%s" % (year, month, day)
 
-    table_name = "%s_%s" % (table_prefix, date)
+    table_name = "%s_%s" % (table_prefix, date) # eg device_sensors_par_2015_08_01
     redshift_table = "%s_%s" % (table_prefix, yy_mm)
     prefix = "%s_%s" % (table_prefix, date) 
     folder = "%s_%s" % (table_prefix, date)
-    bucket_name = "device_sensors_%s/%s" % (yy_mm, date)
 
+    # set s3 bucket name
+    if "device" in table_prefix:
+        bucket_name = "device_sensors_%s/%s" % (yy_mm, date)
+    else:
+        bucket_name = "tracker_motion_%s/%s" % (yy_mm, date)
 
+    # create data folder if not exist
     if not os.path.isdir(folder):
         logging.debug("Creating folder for data: %s", folder)
         os.makedirs(folder)
 
+
     # 1. Get data from DB
     datafile = "%s/%s.csv" % (folder, prefix)
     if get_db == 'yes':
-        start_ts = int(time.time())
         logging.debug("\n\nGetting data from RDS table %s", table_name)
-        os.system("./get_data.sh %s %s %s %s" % (
-                table_name, prefix, folder, offset_arg))
+        start_ts = int(time.time())
+
+        # get_data.sh
+        os.system("./get_data.sh %s %s %s" % (table_name, prefix, folder))
+
         lapse = int(time.time()) - start_ts
         logging.debug("get data time taken: %d", lapse)
 
-        logging.debug("check table size")
-        lines = open("%s.count" % table_name).read().split("\n")
-        line_count = int(lines[0].split()[0])
+        line_count = 0
+        with open("%s.count" % table_name) as fp:
+            lines = fp.read().split("\n")
+            line_count = int(lines[0].split()[0])
 
+        if line_count == 0:
+            logging.error("no data retrieved from RDS")
+            sys.exit()
+
+        logging.debug("\nGet table size from RDS")
+        start_ts = int(time.time())
+
+        # get_count.sh
         os.system("./get_count.sh %s" % (table_name))
+
+        lapse = int(time.time()) - start_ts
+        logging.debug("get count time taken: %d", lapse)
+
+        # check counts
+        logging.debug("check table size")
         lines = open("%s.rds_count" % table_name).read().split("\n")
         rds_line_count = int(lines[0].split()[0])
+
         if rds_line_count != line_count:
             logging.error("Downloaded file %s has insufficient data")
             sys.exit()
@@ -102,10 +116,12 @@ def main(args):
             logging.debug("line counts matches %d", line_count)
 
 
-    # check if file exist
+    # make sure data file exists
     gzip_datafile = "%s.csv.gz" % prefix
-    logging.debug("\n\nCheck if datafile %s exist", datafile)
-    if not os.path.isfile(datafile):
+    logging.debug("\n\nCheck if datafile %s, %s exist",
+                datafile, gzip_datafile)
+    if not os.path.isfile(datafile) and not \
+        os.path.isfile("%s/%s" % (folder, gzip_datafile)):
         logging.error("Data not downloaded to %s", datafile)
         logging.debug("exiting....")
         sys.exit()
@@ -165,8 +181,8 @@ def main(args):
     # 3. upload to S3
     logging.debug("\n\nPreparing to upload to S3 %s/%s/%s",
                 S3_MAIN_BUCKET, bucket_name, date)
-
     start_ts = int(time.time())
+
     onlyfiles = [ f for f in os.listdir(folder)
                 if os.path.isfile(os.path.join(folder,f)) ]
 
@@ -176,21 +192,44 @@ def main(args):
     conn = S3Connection(aws_key, aws_secret)
     bucket = conn.get_bucket(S3_MAIN_BUCKET)
 
-    for org_filename in onlyfiles:
-        cmd = "pigz %s/%s" % (folder, org_filename)
-        logging.debug(cmd)
-        os.system(cmd)
+    uploaded = bucket.list(bucket_name)
+    up_files = []
+    for k in uploaded: up_files.append(k.key)
 
-        filename = "%s.gz" % org_filename
+
+    for org_filename in onlyfiles:
+        if '.gz' not in org_filename:
+            cmd = "pigz %s/%s" % (folder, org_filename)
+            logging.debug(cmd)
+
+            os.system(cmd)
+
+            filename = "%s.gz" % org_filename
+        else:
+            filename = org_filename
+
         logging.debug("---- Uploading file %s", filename)
         k = Key(bucket)
         k.key = "%s/%s" % (bucket_name, filename)
 
         # get md5 checksum for verification
-        file_md5 = hashlib.md5(
-                open("%s/%s" % (folder, filename), 'rb').read()).hexdigest()
+        os.system("md5sum %s/%s > md5info" % (folder, filename))
+        file_md5 = open("md5info", 'r').read().split('  ')[0]
+        logging.debug("md5sum = %s", file_md5)
+
         file_info.setdefault(filename, {})
         file_info[filename]['checksum'] = file_md5
+
+        if 'gz' in org_filename:
+            file_info[filename]['size'] = CHUNK_SIZE
+            t = os.path.getmtime("%s/%s" %(folder, filename))
+            modified_dt = datetime.fromtimestamp(t)
+            file_info[filename]['created'] = datetime.strftime(
+                modified_dt, "%Y-%m-%d %H:%M:%S")
+
+        if "%s/%s" % (bucket_name, filename) in up_files:
+            logging.debug("Already uploaded %s", filename)
+            continue
 
         aws_md5 = Key.get_md5_from_hexdigest(k, file_md5)
         logging.debug("md5: %s, %r", file_md5, aws_md5)
@@ -210,12 +249,6 @@ def main(args):
     num_errors = 0
     not_found_errors = 0
     dynamo_table = Table('redshift_log')
-    dynamo_generic_item = {'filename': 'none',
-        'size': 0,
-        'created': str(datetime.now()),
-        'uploaded_s3': False,
-        'added_manifest': False,
-    }
 
     for key_val in rs_keys:
         if bucket_name not in key_val.key:
@@ -226,32 +259,33 @@ def main(args):
             logging.error("Empty filename %r", key_val.key)
             continue
 
-        d_item = dict(dynamo_generic_item)
-        d_item['filename'] = filename
-        d_item['uploaded_s3'] = True
+        if filename == gzip_datafile:
+            continue
 
         if filename not in file_info:
             logging.error("file %s not found!! key %r", filename, key_val.key)
             not_found_errors += 1
             continue
-        else:
-            # checksum
-            logging.debug("check info for file %s: %r",
-                    filename, file_info[filename])
+        # checksum
+        logging.debug("check info for file %s: %r",
+                filename, file_info[filename])
 
-            local_checksum = file_info[filename]['checksum']
-            s3_checksum = key_val.etag.strip('"')
+        local_checksum = file_info[filename]['checksum']
+        s3_checksum = key_val.etag.strip('"')
 
-            d_item['size'] = file_info[filename]['size']
-            d_item['created'] = file_info[filename]['created']
-            d_item['local_checksum'] = local_checksum
-            d_item['s3_checksum'] = s3_checksum
+        d_item = {
+            'filename': filename,
+            'uploaded_s3': True,
+            'size': file_info[filename]['size'],
+            'created': file_info[filename]['created'],
+            'local_checksum': local_checksum,
+            's3_checksum': s3_checksum}
 
-            if local_checksum != s3_checksum:
-                logging.error("fail checksum file: %s, checksum: %s, etag: %s",
-                        filename, local_checksum, s3_checksum)
-                num_errors += 1
-                d_item['errors'] = ERROR_CHECKSUM
+        if local_checksum != s3_checksum:
+            logging.error("fail checksum file: %s, checksum: %s, etag: %s",
+                    filename, local_checksum, s3_checksum)
+            num_errors += 1
+            d_item['errors'] = ERROR_CHECKSUM
 
         logging.debug("dynamo item: %r", d_item)
         new_item = Item(dynamo_table, data=d_item)
@@ -356,22 +390,17 @@ def main(args):
 
 
 if __name__ == "__main__":
-    # python upload.py device_sensors_2015_02 device_sensors_par_2015_02
-    # device_sensors 0 device_sensors_2015_02 yes no
-    comments = """
-    prev
-    python upload.py device_sensors_par_2015_07_08 device_sensors_par_2015_07 device_sensors_par_2015_07_08 device_sensors_2015_07_08 0 device_sensors_2015_08 yes yes
-
-    python upload.py device_sensors_par 2015 07 08 0 yes yes
-    [table_prefix] [year] [month] [day] [offset] [get_db] [do_split]
+    """Example:
+    python upload.py device_sensors_par 2015 08 03 yes yes >
+    migrate_2015_08_03.log 2>&1
     """
-    if len(sys.argv) != 8:
-        # print "Usage: python upload.py [rds_table_name] [rs_tablename] " + \
-        #     "[prefix] [folder] [offset] [bucket_name] [get_db] [do_split]\n\n"
+
+    if len(sys.argv) != 7:
         print "Usage: python upload.py [table_prefix] [YYYY] [MM] [DD] " + \
-                "[offset] [get_db] [do_split]\n\n"
+                "[get_db] [do_split]\n\n"
         print "get_db: yes/no"
         print "do_split: yes/no"
+        print "set DD to -1 to get a monthly table"
         sys.exit()
 
     main(sys.argv)
