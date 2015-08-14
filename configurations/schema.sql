@@ -103,3 +103,32 @@ GRANT ALL ON tracker_motion_par_2015_08 TO migrator;
 GRANT ALL ON tracker_motion_par_2015_08 TO tim;
 
 GRANT SELECT ON ALL TABLES IN SCHEMA public TO GROUP data;
+
+
+-- need to update each month
+CREATE OR REPLACE VIEW tracker_motion_master AS 
+SELECT * FROM tracker_motion_par_2015_02 UNION ALL 
+SELECT * FROM tracker_motion_par_2015_03 UNION ALL 
+SELECT * FROM tracker_motion_par_2015_04 UNION ALL 
+SELECT * FROM tracker_motion_par_2015_05 UNION ALL 
+SELECT * FROM tracker_motion_par_2015_06 UNION ALL 
+SELECT * FROM tracker_motion_par_2015_07 UNION ALL 
+SELECT * FROM tracker_motion_par_2015_08 ORDER BY local_utc_ts;
+
+GRANT SELECT ON tracker_motion_master TO GROUP data;
+GRANT ALL ON tracker_motion_master TO tim;
+GRANT ALL ON tracker_motion_master TO migrator;
+
+-- need to update each month
+CREATE OR REPLACE VIEW device_sensors_master AS 
+SELECT * FROM device_sensors_par_2015_02 UNION ALL 
+SELECT * FROM device_sensors_par_2015_03 UNION ALL 
+SELECT * FROM device_sensors_par_2015_04 UNION ALL 
+SELECT * FROM device_sensors_par_2015_05 UNION ALL 
+SELECT * FROM device_sensors_par_2015_06 UNION ALL 
+SELECT * FROM device_sensors_par_2015_07 UNION ALL 
+SELECT * FROM device_sensors_par_2015_08 ORDER BY ts;
+
+GRANT SELECT ON device_sensors_master TO GROUP data;
+GRANT ALL ON device_sensors_master TO tim;
+GRANT ALL ON device_sensors_master TO migrator;
