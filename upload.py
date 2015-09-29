@@ -62,8 +62,7 @@ def main(args):
     prefix = "%s_%s" % (table_prefix, date) 
     folder = "%s_%s" % (table_prefix, date)
 
-    # set s3 bucket name
-    if "device" in table_prefix:
+    if table_prefix == 'device_sensors_par':
         bucket_name = "device_sensors_%s/%s" % (yy_mm, date)
     else:
         bucket_name = "tracker_motion_%s/%s" % (yy_mm, date)
@@ -118,10 +117,8 @@ def main(args):
 
     # make sure data file exists
     gzip_datafile = "%s.csv.gz" % prefix
-    logging.debug("\n\nCheck if datafile %s, %s exist",
-                datafile, gzip_datafile)
-    if not os.path.isfile(datafile) and not \
-        os.path.isfile("%s/%s" % (folder, gzip_datafile)):
+    logging.debug("\n\nCheck if datafile %s exist", datafile)
+    if not os.path.isfile(datafile):
         logging.error("Data not downloaded to %s", datafile)
         logging.debug("exiting....")
         sys.exit()
@@ -249,6 +246,12 @@ def main(args):
     num_errors = 0
     not_found_errors = 0
     dynamo_table = Table('redshift_log')
+    dynamo_generic_item = {'filename': 'none',
+        'size': 0,
+        'created': str(datetime.now()),
+        'uploaded_s3': False,
+        'added_manifest': False,
+    }
 
     for key_val in rs_keys:
         if bucket_name not in key_val.key:
@@ -262,30 +265,32 @@ def main(args):
         if filename == gzip_datafile:
             continue
 
+        d_item = dict(dynamo_generic_item)
+        d_item['filename'] = filename
+        d_item['uploaded_s3'] = True
+
         if filename not in file_info:
             logging.error("file %s not found!! key %r", filename, key_val.key)
             not_found_errors += 1
             continue
-        # checksum
-        logging.debug("check info for file %s: %r",
-                filename, file_info[filename])
+        else:
+            # checksum
+            logging.debug("check info for file %s: %r",
+                    filename, file_info[filename])
 
-        local_checksum = file_info[filename]['checksum']
-        s3_checksum = key_val.etag.strip('"')
+            local_checksum = file_info[filename]['checksum']
+            s3_checksum = key_val.etag.strip('"')
 
-        d_item = {
-            'filename': filename,
-            'uploaded_s3': True,
-            'size': file_info[filename]['size'],
-            'created': file_info[filename]['created'],
-            'local_checksum': local_checksum,
-            's3_checksum': s3_checksum}
+            d_item['size'] = file_info[filename]['size']
+            d_item['created'] = file_info[filename]['created']
+            d_item['local_checksum'] = local_checksum
+            d_item['s3_checksum'] = s3_checksum
 
-        if local_checksum != s3_checksum:
-            logging.error("fail checksum file: %s, checksum: %s, etag: %s",
-                    filename, local_checksum, s3_checksum)
-            num_errors += 1
-            d_item['errors'] = ERROR_CHECKSUM
+            if local_checksum != s3_checksum:
+                logging.error("fail checksum file: %s, checksum: %s, etag: %s",
+                        filename, local_checksum, s3_checksum)
+                num_errors += 1
+                d_item['errors'] = ERROR_CHECKSUM
 
         logging.debug("dynamo item: %r", d_item)
         new_item = Item(dynamo_table, data=d_item)

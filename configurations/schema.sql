@@ -57,11 +57,16 @@ CREATE TABLE IF NOT EXISTS device_sensors_par_2015_08 (LIKE device_sensors_par_2
 GRANT ALL ON device_sensors_par_2015_08 TO migrator;
 GRANT ALL ON device_sensors_par_2015_08 TO tim;
 
-
 CREATE TABLE IF NOT EXISTS device_sensors_par_2015_09 (LIKE device_sensors_par_2015_02);
 GRANT ALL ON device_sensors_par_2015_09 TO migrator;
 GRANT ALL ON device_sensors_par_2015_09 TO tim;
 GRANT ALL ON device_sensors_par_2015_09 TO kingshy;
+
+CREATE TABLE IF NOT EXISTS device_sensors_par_2015_10 (LIKE device_sensors_par_2015_02);
+GRANT ALL ON device_sensors_par_2015_10 TO migrator;
+GRANT ALL ON device_sensors_par_2015_10 TO tim;
+
+--update device_sensor tables every month
 
 -- tracker motion
 CREATE TABLE tracker_motion_par_2015_02(
@@ -111,6 +116,12 @@ CREATE TABLE tracker_motion_par_2015_09 (LIKE tracker_motion_par_2015_02);
 GRANT ALL ON tracker_motion_par_2015_09 TO migrator;
 GRANT ALL ON tracker_motion_par_2015_09 TO tim;
 
+CREATE TABLE tracker_motion_par_2015_10 (LIKE tracker_motion_par_2015_02);
+GRANT ALL ON tracker_motion_par_2015_10 TO migrator;
+GRANT ALL ON tracker_motion_par_2015_10 TO tim;
+
+-- Update tracker motion tables monthly
+
 GRANT SELECT ON ALL TABLES IN SCHEMA public TO GROUP data;
 
 
@@ -123,7 +134,8 @@ SELECT * FROM tracker_motion_par_2015_05 UNION ALL
 SELECT * FROM tracker_motion_par_2015_06 UNION ALL 
 SELECT * FROM tracker_motion_par_2015_07 UNION ALL 
 SELECT * FROM tracker_motion_par_2015_08 UNION ALL 
-SELECT * FROM tracker_motion_par_2015_09 ORDER BY local_utc_ts;
+SELECT * FROM tracker_motion_par_2015_09 UNION ALL 
+SELECT * FROM tracker_motion_par_2015_10 ORDER BY local_utc_ts;
 
 GRANT SELECT ON tracker_motion_master TO GROUP data;
 GRANT ALL ON tracker_motion_master TO tim;
@@ -138,8 +150,10 @@ SELECT * FROM device_sensors_par_2015_05 UNION ALL
 SELECT * FROM device_sensors_par_2015_06 UNION ALL 
 SELECT * FROM device_sensors_par_2015_07 UNION ALL 
 SELECT * FROM device_sensors_par_2015_08 UNION ALL 
-SELECT * FROM device_sensors_par_2015_09 ORDER BY ts;
+SELECT * FROM device_sensors_par_2015_09 UNION ALL 
+SELECT * FROM device_sensors_par_2015_10 ORDER BY ts;
 
 GRANT SELECT ON device_sensors_master TO GROUP data;
 GRANT ALL ON device_sensors_master TO tim;
 GRANT ALL ON device_sensors_master TO migrator;
+
