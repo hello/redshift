@@ -22,6 +22,8 @@ import boto
 from boto.dynamodb2.table import Table
 from boto.dynamodb2.items import Item
 
+import slackbot
+
 REDSHIFT_HOST = 'sensors2.cy7n0vzxfedi.us-east-1.redshift.amazonaws.com'
 REDSHIFT_PSQL = "psql -h %s -U migrator -p 5439 -d sensors1" % (REDSHIFT_HOST)
 DYNAMODB_TABLE = 'redshift_log' # logs
@@ -122,6 +124,8 @@ def main(args):
 
         if line_count == 0:
             logging.error("no data retrieved from RDS")
+            slackbot.post(table_prefix, date,
+                        "No data downloaded from RDS, die now! :poop:")
             sys.exit()
 
         c_item['step_01_get_data'] = line_count
@@ -145,7 +149,10 @@ def main(args):
     
 
         if rds_line_count != line_count:
-            logging.error("Downloaded file %s has insufficient data")
+            logging.error("Downloaded file %s has insufficient data", datafile)
+            logging.error("Exiting prematurely!!!")
+            slackbot.post(table_prefix, date,
+                    "Data file has different number of rows as RDS, die now! :poop:")
             sys.exit()
         else:
             logging.debug("line counts matches %d", line_count)
@@ -159,6 +166,7 @@ def main(args):
     if not os.path.isfile(datafile):
         logging.error("Data not downloaded to %s", datafile)
         logging.debug("exiting....")
+        slackbot.post(table_prefix, date, "Missing datafile, die now! :poop:")
         sys.exit()
 
     c_item['step_04_check_datafile'] = True
@@ -470,7 +478,8 @@ def main(args):
     c_item['step_13_done'] = True
     c_res = c_item.partial_save()
 
-
+    slackbot.post(table_prefix, date,
+        "Done. %d rows migrated. :boom:" % (c_item['step_12_num_rows_copied']))
 
 
 if __name__ == "__main__":
