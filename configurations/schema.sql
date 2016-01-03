@@ -75,6 +75,10 @@ GRANT ALL ON device_sensors_par_2015_12 TO migrator;
 GRANT ALL ON device_sensors_par_2015_12 TO tim;
 
 
+CREATE TABLE IF NOT EXISTS device_sensors_par_2016_01 (LIKE device_sensors_par_2015_02);
+GRANT ALL ON device_sensors_par_2016_01 TO migrator;
+GRANT ALL ON device_sensors_par_2016_01 TO tim;
+
 --update device_sensor tables every month
 
 -- tracker motion
@@ -137,6 +141,10 @@ CREATE TABLE tracker_motion_par_2015_12 (LIKE tracker_motion_par_2015_02);
 GRANT ALL ON tracker_motion_par_2015_12 TO migrator;
 GRANT ALL ON tracker_motion_par_2015_12 TO tim;
 
+CREATE TABLE tracker_motion_par_2016_01 (LIKE tracker_motion_par_2015_02);
+GRANT ALL ON tracker_motion_par_2016_01 TO migrator;
+GRANT ALL ON tracker_motion_par_2016_01 TO tim;
+
 -- Update tracker motion tables monthly
 
 GRANT SELECT ON ALL TABLES IN SCHEMA public TO GROUP data;
@@ -154,7 +162,8 @@ SELECT * FROM tracker_motion_par_2015_08 UNION ALL
 SELECT * FROM tracker_motion_par_2015_09 UNION ALL 
 SELECT * FROM tracker_motion_par_2015_10 UNION ALL
 SELECT * FROM tracker_motion_par_2015_11 UNION ALL
-SELECT * FROM tracker_motion_par_2015_12  
+SELECT * FROM tracker_motion_par_2015_12 UNION ALL 
+SELECT * FROM tracker_motion_par_2016_01  
 ORDER BY local_utc_ts;
 
 GRANT SELECT ON tracker_motion_master TO GROUP data;
@@ -173,7 +182,8 @@ SELECT * FROM device_sensors_par_2015_08 UNION ALL
 SELECT * FROM device_sensors_par_2015_09 UNION ALL 
 SELECT * FROM device_sensors_par_2015_10 UNION ALL
 SELECT * FROM device_sensors_par_2015_11 UNION ALL
-SELECT * FROM device_sensors_par_2015_12  
+SELECT * FROM device_sensors_par_2015_12 UNION ALL
+SELECT * FROM device_sensors_par_2016_01 
 ORDER BY ts;
 
 GRANT SELECT ON device_sensors_master TO GROUP data;
