@@ -1,6 +1,11 @@
 -- CREATE USER kingshy WTIH PASSWORD 'give-a-password' IN GROUP data;
 CREATE GROUP data;
 
+---- create read-only user
+-- CREATE USER admin_tool WITH PASSWORD 'blah';
+-- GRANT USAGE on SCHEMA public to admin_tool;
+-- GRANT SELECT on <table_name> TO admin_tool;
+
 -- Interleaved key problem, use COMPOUND
 CREATE TABLE device_sensors_par_2015_02 (
     id BIGINT PRIMARY KEY,
