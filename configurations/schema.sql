@@ -83,7 +83,7 @@ GRANT SELECT, INSERT, UPDATE ON device_sensors_par_2016_01 TO migrator;
 GRANT ALL ON device_sensors_par_2016_01 TO tim;
 
 CREATE TABLE IF NOT EXISTS device_sensors_par_2016_02 (LIKE device_sensors_par_2015_02);
-GRANT SELECT, INSERT, UPDATE ON device_sensors_par_2016_01 TO migrator;
+GRANT SELECT, INSERT, UPDATE ON device_sensors_par_2016_02 TO migrator;
 GRANT ALL ON device_sensors_par_2016_01 TO tim;
 --update device_sensor tables every month
 
@@ -158,6 +158,20 @@ GRANT ALL ON tracker_motion_par_2016_02 TO tim;
 
 GRANT SELECT ON ALL TABLES IN SCHEMA public TO GROUP data;
 
+-- new column for device_sensors 02/09/2016
+ALTER TABLE device_sensors_par_2015_02 ADD COLUMN audio_peak_energy_db INTEGER;
+ALTER TABLE device_sensors_par_2015_03 ADD COLUMN audio_peak_energy_db INTEGER;
+ALTER TABLE device_sensors_par_2015_04 ADD COLUMN audio_peak_energy_db INTEGER;
+ALTER TABLE device_sensors_par_2015_05 ADD COLUMN audio_peak_energy_db INTEGER;
+ALTER TABLE device_sensors_par_2015_06 ADD COLUMN audio_peak_energy_db INTEGER;
+ALTER TABLE device_sensors_par_2015_07 ADD COLUMN audio_peak_energy_db INTEGER;
+ALTER TABLE device_sensors_par_2015_08 ADD COLUMN audio_peak_energy_db INTEGER;
+ALTER TABLE device_sensors_par_2015_09 ADD COLUMN audio_peak_energy_db INTEGER;
+ALTER TABLE device_sensors_par_2015_10 ADD COLUMN audio_peak_energy_db INTEGER;
+ALTER TABLE device_sensors_par_2015_11 ADD COLUMN audio_peak_energy_db INTEGER;
+ALTER TABLE device_sensors_par_2015_12 ADD COLUMN audio_peak_energy_db INTEGER;
+ALTER TABLE device_sensors_par_2016_01 ADD COLUMN audio_peak_energy_db INTEGER;
+ALTER TABLE device_sensors_par_2016_02 ADD COLUMN audio_peak_energy_db INTEGER;
 
 -- need to update each month
 CREATE OR REPLACE VIEW tracker_motion_master AS 
@@ -204,4 +218,5 @@ GRANT SELECT, INSERT, UPDATE ON device_sensors_master TO migrator;
 CREATE GROUP prod;
 create user anomaly with password 'thepassword' in group prod;
 GRANT SELECT ON prod_sense_data, tracker_motion_master TO GROUP prod;
+
 
