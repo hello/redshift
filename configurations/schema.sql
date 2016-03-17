@@ -231,3 +231,4 @@ create user anomaly with password 'thepassword' in group prod;
 GRANT SELECT ON prod_sense_data, tracker_motion_master TO GROUP prod;
 
 
+CREATE user suripu_queue with password 'password' in group prod;
