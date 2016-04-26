@@ -242,3 +242,8 @@ GRANT SELECT ON prod_sense_data, tracker_motion_master TO GROUP prod;
 
 
 CREATE user suripu_queue with password 'password' in group prod;
+
+CREATE user jarred with password '' in group data;
+
+ALTER GROUP data ADD USER tim;
+

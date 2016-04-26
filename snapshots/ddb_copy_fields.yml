@@ -1,0 +1,51 @@
+
+prod_insights:
+  - account_id
+  - category
+  - date_category
+  - insight_type
+  - time_period
+  - timestamp_utc
+
+prod_sleep_stats_v_0_2:
+  - account_id
+  - avg_motion_amplitude
+  - awake_score
+  - awake_time 
+  - date
+  - day_of_week
+  - duration_score
+  - env_score
+  - fall_asleep_time
+  - light_sleep
+  - max_motion_amplitude
+  - medium_sleep
+  - motion_period_mins
+  - motion_score
+  - num_motions
+  - offset_millis
+  - score
+  - sleep_duration
+  - sleep_motion_count
+  - sleep_onset_minutes
+  - sound_sleep
+  - type
+  - version
+
+prod_pill_heartbeat:
+
+prod_app_stats:
+
+prod_timezone_history:
+
+prod_ring_history_by_account:
+  - account_id
+  - actual_ring_time
+  - created_at_utc
+  - device_id
+  - expected_ring_time
+  - ring_time_object
+
+prod_sense_last_seen:
+
+prod_pill_last_seen:
