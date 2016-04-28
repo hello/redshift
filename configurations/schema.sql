@@ -94,6 +94,10 @@ CREATE TABLE IF NOT EXISTS device_sensors_par_2016_04 (LIKE device_sensors_par_2
 GRANT SELECT, INSERT, UPDATE ON device_sensors_par_2016_04 TO migrator;
 GRANT ALL ON device_sensors_par_2016_04 TO tim;
 
+CREATE TABLE IF NOT EXISTS device_sensors_par_2016_05 (LIKE device_sensors_par_2015_02);
+GRANT SELECT, INSERT, UPDATE ON device_sensors_par_2016_05 TO migrator;
+GRANT ALL ON device_sensors_par_2016_05 TO tim;
+
 --update device_sensor tables every month
 
 -- tracker motion
@@ -171,6 +175,10 @@ GRANT ALL ON tracker_motion_par_2016_03 TO tim;
 CREATE TABLE tracker_motion_par_2016_04 (LIKE tracker_motion_par_2015_02);
 GRANT SELECT, INSERT, UPDATE ON tracker_motion_par_2016_04 TO migrator;
 GRANT ALL ON tracker_motion_par_2016_04 TO tim;
+
+CREATE TABLE tracker_motion_par_2016_05 (LIKE tracker_motion_par_2015_02);
+GRANT SELECT, INSERT, UPDATE ON tracker_motion_par_2016_05 TO migrator;
+GRANT ALL ON tracker_motion_par_2016_05 TO tim;
 -- Update tracker motion tables monthly
 
 GRANT SELECT ON ALL TABLES IN SCHEMA public TO GROUP data;
@@ -206,7 +214,8 @@ SELECT * FROM tracker_motion_par_2015_12 UNION ALL
 SELECT * FROM tracker_motion_par_2016_01 UNION ALL 
 SELECT * FROM tracker_motion_par_2016_02 UNION ALL 
 SELECT * FROM tracker_motion_par_2016_03 UNION ALL 
-SELECT * FROM tracker_motion_par_2016_04  
+SELECT * FROM tracker_motion_par_2016_04 UNION ALL
+SELECT * FROM tracker_motion_par_2016_05  
 ORDER BY local_utc_ts;
 
 GRANT SELECT ON tracker_motion_master TO GROUP data;
@@ -229,7 +238,8 @@ SELECT * FROM device_sensors_par_2015_12 UNION ALL
 SELECT * FROM device_sensors_par_2016_01 UNION ALL 
 SELECT * FROM device_sensors_par_2016_02 UNION ALL 
 SELECT * FROM device_sensors_par_2016_03 UNION ALL 
-SELECT * FROM device_sensors_par_2016_04 
+SELECT * FROM device_sensors_par_2016_04 UNION ALL 
+SELECT * FROM device_sensors_par_2016_05 
 ORDER BY ts;
 
 GRANT SELECT ON device_sensors_master TO GROUP data;
