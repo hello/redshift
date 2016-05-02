@@ -1,6 +1,5 @@
 CREATE TABLE dev_pill_data (
   account_id BIGINT,
-  tracker_id BIGINT,
   external_tracker_id VARCHAR(100),
   svm_no_gravity INTEGER,
   ts TIMESTAMP WITHOUT TIME ZONE,
