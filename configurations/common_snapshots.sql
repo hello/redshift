@@ -19,6 +19,7 @@ COMPOUND SORTKEY (id);
 
 GRANT ALL ON questions to migrator;
 GRANT SELECT ON questions to GROUP data;
+ALTER TABLE questions OWNER TO migrator;
 
 
 ---- export from postres
@@ -46,6 +47,7 @@ COMPOUND SORTKEY (account_id, question_id);
 
 GRANT ALL ON account_questions to migrator;
 GRANT SELECT ON account_questions to GROUP data;
+ALTER TABLE account_questions OWNER TO migrator;
 
 ---- common-db export
 -- \copy (SELECT * FROM account_questions) TO '/home/ubuntu/snapshots/commondb/account_questions.csv' CSV;
@@ -75,6 +77,7 @@ COMPOUND SORTKEY (account_id, question_id);
 
 GRANT ALL ON responses to migrator;
 GRANT SELECT ON responses to GROUP data;
+ALTER TABLE responses OWNER TO migrator;
 
 ---- common-db export
 -- \copy (SELECT * FROM responses) TO '/home/ubuntu/snapshots/commondb/responses.csv' CSV;
@@ -100,6 +103,7 @@ COMPOUND SORTKEY(question_id);
 
 GRANT ALL ON response_choices to migrator;
 GRANT SELECT ON response_choices to GROUP data;
+ALTER TABLE response_choices OWNER TO migrator;
 
 ---- common-db export
 -- \copy (SELECT * FROM response_choices) TO '/home/ubuntu/snapshots/commondb/response_choices.csv' CSV;
