@@ -253,7 +253,9 @@ GRANT SELECT ON prod_sense_data, tracker_motion_master TO GROUP prod;
 
 CREATE user suripu_queue with password 'password' in group prod;
 
-CREATE user jarred with password '' in group data;
+CREATE user jarred with password 'blah' in group data;
 
 ALTER GROUP data ADD USER tim;
 
+CREATE user bryan with password 'blah';
+GRANT SELECT ON sense_keystore to bryan;
