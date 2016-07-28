@@ -101,6 +101,11 @@ GRANT ALL ON device_sensors_par_2016_05 TO tim;
 CREATE TABLE IF NOT EXISTS device_sensors_par_2016_06 (LIKE device_sensors_par_2015_02);
 GRANT SELECT, INSERT, UPDATE ON device_sensors_par_2016_06 TO migrator;
 GRANT ALL ON device_sensors_par_2016_06 TO tim;
+
+CREATE TABLE IF NOT EXISTS device_sensors_par_2016_07 (LIKE device_sensors_par_2015_02);
+GRANT SELECT, INSERT, UPDATE ON device_sensors_par_2016_07 TO migrator;
+GRANT ALL ON device_sensors_par_2016_07 TO tim;
+
 --update device_sensor tables every month
 
 -- tracker motion
@@ -187,6 +192,10 @@ CREATE TABLE tracker_motion_par_2016_06 (LIKE tracker_motion_par_2015_02);
 GRANT SELECT, INSERT, UPDATE ON tracker_motion_par_2016_06 TO migrator;
 GRANT ALL ON tracker_motion_par_2016_06 TO tim;
 
+CREATE TABLE tracker_motion_par_2016_07 (LIKE tracker_motion_par_2015_02);
+GRANT SELECT, INSERT, UPDATE ON tracker_motion_par_2016_07 TO migrator;
+GRANT ALL ON tracker_motion_par_2016_07 TO tim;
+
 -- Update tracker motion tables monthly
 
 GRANT SELECT ON ALL TABLES IN SCHEMA public TO GROUP data;
@@ -224,7 +233,8 @@ SELECT * FROM tracker_motion_par_2016_02 UNION ALL
 SELECT * FROM tracker_motion_par_2016_03 UNION ALL 
 SELECT * FROM tracker_motion_par_2016_04 UNION ALL
 SELECT * FROM tracker_motion_par_2016_05 UNION ALL 
-SELECT * FROM tracker_motion_par_2016_06 
+SELECT * FROM tracker_motion_par_2016_06 UNION ALL
+SELECT * FROM tracker_motion_par_2016_07 
 ORDER BY local_utc_ts;
 
 GRANT SELECT ON tracker_motion_master TO GROUP data;
@@ -249,7 +259,8 @@ SELECT * FROM device_sensors_par_2016_02 UNION ALL
 SELECT * FROM device_sensors_par_2016_03 UNION ALL 
 SELECT * FROM device_sensors_par_2016_04 UNION ALL 
 SELECT * FROM device_sensors_par_2016_05 UNION ALL 
-SELECT * FROM device_sensors_par_2016_06 
+SELECT * FROM device_sensors_par_2016_06 UNION ALL 
+SELECT * FROM device_sensors_par_2016_07 
 ORDER BY ts;
 
 GRANT SELECT ON device_sensors_master TO GROUP data;
@@ -269,3 +280,9 @@ ALTER GROUP data ADD USER tim;
 
 CREATE user bryan with password 'blah';
 GRANT SELECT ON sense_keystore to bryan;
+
+GRANT SELECT on prod_pill_data to GROUP data;
+GRANT SELECT on prod_pill_data to tim;
+
+CREATE user jimmy with password 'blah';
+GRANT SELECT ON prod_pill_data, tracker_motion_master to jimmy;
