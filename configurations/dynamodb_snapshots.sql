@@ -155,4 +155,24 @@ GRANT ALL ON prod_pill_last_seen TO migrator;
 GRANT SELECT ON prod_pill_last_seen TO GROUP data;
 ALTER TABLE prod_pill_last_seen OWNER to migrator;
 
+--
+-- prod_agg_stats_v_0_1
+--
+CREATE TABLE prod_agg_stats (
+  aid INTEGER,
+  avg_day_dust_density INTEGER,
+  avg_day_humid INTEGER,
+  avg_day_temp INTEGER,
+  "date_local|sense_id" VARCHAR(32),
+  deve_data_count INTEGER,
+  dow INTEGER,
+  max_day_temp INTEGER,
+  min_day_temp INTEGER,
+  sum_count_mlux_hrs_map VARCHAR(512),
+  tracker_motion_count INTEGER
+) DISTSTYLE KEY DISTKEY (aid)
+COMPOUND SORTKEY (aid, "date_local|sense_id");
 
+GRANT ALL ON prod_agg_stats TO migrator;
+GRANT SELECT ON prod_agg_stats TO GROUP data;
+ALTER TABLE prod_agg_stats OWNER to migrator;
