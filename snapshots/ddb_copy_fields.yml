@@ -49,3 +49,29 @@ prod_ring_history_by_account:
 prod_sense_last_seen:
 
 prod_pill_last_seen:
+
+prod_speech_results:
+  - cmd
+  - cmd_result
+  - conf
+  - created_utc
+  - handler_type
+  - resp_text
+  - service
+  - text
+  - updated
+  - uuid
+  - wake_id
+
+speech_results:
+  - cmd
+  - cmd_result
+  - conf
+  - created_utc
+  - handler_type
+  - resp_text
+  - service
+  - text
+  - updated
+  - uuid
+  - wake_id
