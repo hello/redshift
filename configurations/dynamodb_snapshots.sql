@@ -176,3 +176,45 @@ COMPOUND SORTKEY (aid, "date_local|sense_id");
 GRANT ALL ON prod_agg_stats TO migrator;
 GRANT SELECT ON prod_agg_stats TO GROUP data;
 ALTER TABLE prod_agg_stats OWNER to migrator;
+
+
+--
+-- speech_results (dev and prod)
+--
+CREATE TABLE prod_speech_results (
+  cmd VARCHAR(64),
+  cmd_result VARCHAR(32),
+  conf NUMERIC,
+  created_utc TIMESTAMP WITHOUT TIME ZONE,
+  handler_type VARCHAR(64),
+  resp_text VARCHAR(512),
+  service VARCHAR(32),
+  text VARCHAR(1024),
+  updated TIMESTAMP WITHOUT TIME ZONE,
+  uuid VARCHAR(64),
+  wake_id INTEGER
+) DISTSTYLE EVEN
+COMPOUND SORTKEY (created_utc, cmd_result, text);
+
+GRANT ALL ON prod_speech_results to migrator;
+GRANT SELECT ON prod_speech_results to tim;
+ALTER TABLE prod_speech_results OWNER to migrator;
+
+CREATE TABLE speech_results (like prod_speech_results);
+GRANT SELECT ON speech_results to tim;
+ALTER TABLE speech_results OWNER to migrator;
+
+
+CREATE TABLE prod_speech_timeline (
+  account_id INTEGER,
+  sense_id VARCHAR(100),
+  ts TIMESTAMP WITHOUT TIME ZONE
+) DISTSTYLE KEY DISTKEY (account_id)
+COMPOUND SORTKEY (account_id, sense_id, ts);
+
+GRANT ALL ON prod_speech_timeline to migrator;
+GRANT SELECT ON prod_speech_timeline to tim;
+ALTER TABLE prod_speech_timeline OWNER to migrator;
+
+
+
