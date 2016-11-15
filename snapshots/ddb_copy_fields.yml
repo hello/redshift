@@ -75,3 +75,8 @@ speech_results:
   - updated
   - uuid
   - wake_id
+
+prod_speech_timeline:
+  - account_id
+  - sense_id
+  - ts

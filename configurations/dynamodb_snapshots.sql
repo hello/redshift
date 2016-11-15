@@ -204,3 +204,17 @@ CREATE TABLE speech_results (like prod_speech_results);
 GRANT SELECT ON speech_results to tim;
 ALTER TABLE speech_results OWNER to migrator;
 
+
+CREATE TABLE prod_speech_timeline (
+  account_id INTEGER,
+  sense_id VARCHAR(100),
+  ts TIMESTAMP WITHOUT TIME ZONE
+) DISTSTYLE KEY DISTKEY (account_id)
+COMPOUND SORTKEY (account_id, sense_id, ts);
+
+GRANT ALL ON prod_speech_timeline to migrator;
+GRANT SELECT ON prod_speech_timeline to tim;
+ALTER TABLE prod_speech_timeline OWNER to migrator;
+
+
+
