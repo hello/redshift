@@ -216,5 +216,7 @@ GRANT ALL ON prod_speech_timeline to migrator;
 GRANT SELECT ON prod_speech_timeline to tim;
 ALTER TABLE prod_speech_timeline OWNER to migrator;
 
+-- add fw version to prod_speech_results
+ALTER TABLE prod_speech_results ADD COLUMN fw INTEGER DEFAULT 0;
 
 
