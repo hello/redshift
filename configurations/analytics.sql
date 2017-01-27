@@ -8,14 +8,14 @@
 --
 
 CREATE TABLE actions (
-  account_id INTEGER,
+  account_id BIGINT,
   action VARCHAR(256) NOT NULL,      -- action that user is performing
   result VARCHAR(256) DEFAULT NULL,  -- result of action if exist. e.g. pass/fail/value
   ts TIMESTAMP WITHOUT TIME ZONE,    -- utc 
   offset_millis INTEGER DEFAULT NULL -- local offset if available
-) DISTYLE KEY DISTKEY (account_id)
+) DISTSTYLE KEY DISTKEY (account_id)
 INTERLEAVED SORTKEY (account_id, ts, action);
 
-GRANT ALL ON account_actions to migrator;
-GRANT ALL ON account_actions to group ops;
+GRANT ALL ON actions to migrator;
+GRANT ALL ON actions to group ops;
 
