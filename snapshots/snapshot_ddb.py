@@ -18,7 +18,6 @@ SLACK_HEADERS = {'content-type': 'application/json'}
 CAPACITY_CHANGE_WAIT_TIME = 12 # * 10secs
 WAIT_TIME_CHUNK = 10
 CAPACITY_CHANGE_MAX_MINUTES = 20
-COPY_READ_RATIO = 95 # use 95% of original reads
 
 AWS_SECRET = os.getenv("aws_secret_access_key") # needed to access dynamo
 AWS_ACCESS_KEY = os.getenv("aws_access_key_id")
@@ -62,7 +61,7 @@ def update_read_throughput(table, updated_read_throughput, write_throughput):
 
 def post_slack(text):
     """Update Slack"""
-    payload = {'text': text, 'channel': '#research', 'username': 'redshit_snapshots'}
+    payload = {'text': text, 'channel': '#redshift', 'username': 'redshit_snapshots'}
 
     try:
         requests.post(SLACK_URL, data=json.dumps(payload), headers=SLACK_HEADERS)
@@ -97,8 +96,12 @@ def rename_table(from_table_name, to_table_name, drop=False):
 
 def grant_permissions(table_name):
     """grant"""
-    grant_cmd = "%s -c \"GRANT SELECT ON %s to tim, GROUP data\"" % (
-        REDSHIT_PSQL, table_name)
+    if table_name == 'key_store':
+        grant_cmd = "%s -c \"GRANT ALL ON %s TO GROUP ops\"" % (
+            REDSHIT_PSQL, table_name, table_name)
+    else:
+        grant_cmd = "%s -c \"GRANT SELECT ON %s to tim, GROUP data; GRANT ALL ON %s TO GROUP ops\"" % (
+            REDSHIT_PSQL, table_name, table_name)
     print "Step 5: Grant permissions"
     grant_out = subprocess.check_output(grant_cmd, shell=True)
     if "ERROR" in grant_out:
@@ -123,6 +126,28 @@ def create_table(new_table_name, table_name):
         return False
     return True
 
+def extra_key_store_ops():
+    drop_cmd = "%s -c \"DROP TABLE IF EXISTS key_store_admin_old\"" % (REDSHIT_PSQL)
+    os.system(drop_cmd)
+
+    drop_cmd = "%s -c \"DROP TABLE IF EXISTS key_store_admin_new\"" % (REDSHIT_PSQL)
+    os.system(drop_cmd)
+   
+    create_cmd = "%s -c \"CREATE TABLE key_store_admin_new (like key_store_admin)\"" % (REDSHIT_PSQL)
+    os.system(create_cmd)
+
+    select_cmd = "%s -c \"INSERT INTO key_store_admin_new SELECT created_at, device_id, hw_version, metadata, note FROM key_store\"" % (REDSHIT_PSQL)
+    os.system(select_cmd)
+
+    alter_cmd = "%s -c \"ALTER TABLE key_store_admin RENAME TO key_store_admin_old\"" % (REDSHIT_PSQL)
+    os.system(alter_cmd)
+   
+    alter_cmd = "%s -c \"ALTER TABLE key_store_admin_new RENAME TO key_store_admin\"" % (REDSHIT_PSQL)
+    os.system(alter_cmd)
+
+    grant_cmd = "%s -c \"GRANT SELECT ON key_store_admin to admin_tool\"" % (REDSHIT_PSQL)
+    os.system(grant_cmd)
+
 def main(table_name, skip_throughput=False):
     """main method"""
 
@@ -143,7 +168,10 @@ def main(table_name, skip_throughput=False):
 
     # update read capacity before copying
     if not skip_throughput:
-        copy_throughput = get_new_throughput(item_count)
+        if table_name in ['key_store', 'pill_key_store']:
+            copy_throughput = 2 * org_reads
+        else:
+            copy_throughput = get_new_throughput(item_count)
         print "Updating read throughput to %d for copying" % copy_throughput
 
         update_res = update_read_throughput(ddb_table, copy_throughput, org_writes)
@@ -155,7 +183,11 @@ def main(table_name, skip_throughput=False):
             sys.exit(1)
 
         print "extra 10 mins sleep for capacity change ...."
-        time.sleep(600) # wait another 10 minutes
+        time.sleep(900) # wait another 10 minutes
+
+    read_ratio = 95
+    if table_name in ['key_store', 'pill_key_store']:
+        read_ratio = 60
 
     # PREVIOUSLY, truncate table
     # truncate_cmd = "%s -c \"TRUNCATE %s \"" % (REDSHIT_PSQL, table_name)
@@ -187,8 +219,8 @@ def main(table_name, skip_throughput=False):
     psql -h sensors2.cy7n0vzxfedi.us-east-1.redshift.amazonaws.com -U migrator -p 5439 -d sensors1 << EOF
     COPY %s %s FROM 'dynamodb://%s' 
     credentials 'aws_access_key_id=%s;aws_secret_access_key=%s' 
-    READRATIO 95 timeformat 'auto'
-    """ % (new_table_name, fields, table_name, AWS_ACCESS_KEY, AWS_SECRET)
+    READRATIO %d timeformat 'auto'
+    """ % (new_table_name, fields, table_name, AWS_ACCESS_KEY, AWS_SECRET, read_ratio)
 
     print "Step 2: Copy command: %s" % copy_command
     os.system(copy_command)
@@ -206,6 +238,10 @@ def main(table_name, skip_throughput=False):
     # 5. re-grant permissions
     if grant_permissions(table_name) is False:
         sys.exit()
+
+    # for key_store, create new table w/o aes
+    if table_name == 'key_store':
+        extra_key_store_ops()
 
     # change table throughput to original values
     if not skip_throughput:
@@ -225,8 +261,8 @@ def main(table_name, skip_throughput=False):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) > 3:
-        print "Usage: python snapshot_ddb.py [dynamodb_table]"
+    if len(sys.argv) < 3:
+        print "Usage: python snapshot_ddb.py [dynamodb_table] [skip_throughput 1=yes/0=no]"
         print "Available tables:"
         for name in COPY_FIELDS:
             print "\t%s" % name

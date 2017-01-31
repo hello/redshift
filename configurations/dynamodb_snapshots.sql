@@ -220,3 +220,42 @@ ALTER TABLE prod_speech_timeline OWNER to migrator;
 ALTER TABLE prod_speech_results ADD COLUMN fw INTEGER DEFAULT 0;
 
 
+-- 2017-01-30
+CREATE TABLE key_store (
+  aes_key VARCHAR(256),
+  created_at TIMESTAMP WITHOUT TIME ZONE,
+  device_id VARCHAR(64),
+  hw_version INTEGER,
+  metadata VARCHAR(512),
+  note VARCHAR(512)
+) DISTSTYLE KEY DISTKEY (device_id)
+INTERLEAVED SORTKEY (device_id, metadata);
+
+GRANT ALL ON key_store TO group ops;
+GRANT ALL ON key_store to migrator;
+ALTER TABLE key_store OWNER to migrator;
+
+CREATE TABLE key_store_admin (
+  created_at TIMESTAMP WITHOUT TIME ZONE,
+  device_id VARCHAR(64),
+  hw_version INTEGER,
+  metadata VARCHAR(512),
+  note VARCHAR(512)
+) DISTSTYLE KEY DISTKEY (device_id)
+INTERLEAVED SORTKEY (device_id, metadata);
+
+ALTER TABLE key_store_admin OWNER to migrator;
+GRANT SELECT ON key_store_admin to admin_tool;
+
+
+CREATE TABLE pill_key_store (
+  aes_key VARCHAR(256),
+  created_at TIMESTAMP WITHOUT TIME ZONE,
+  device_id VARCHAR(64),
+  metadata VARCHAR(512),
+  note VARCHAR(512)
+) DISTSTYLE KEY DISTKEY (device_id)
+INTERLEAVED SORTKEY (device_id, metadata);
+
+GRANT ALL ON pill_key_store TO group ops;
+ALTER TABLE pill_key_store OWNER to migrator;
