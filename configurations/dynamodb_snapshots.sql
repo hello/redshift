@@ -259,3 +259,14 @@ INTERLEAVED SORTKEY (device_id, metadata);
 
 GRANT ALL ON pill_key_store TO group ops;
 ALTER TABLE pill_key_store OWNER to migrator;
+
+CREATE TABLE prod_alarm (
+  account_id BIGINT,
+  alarm_templates VARCHAR(65535),
+  updated_at BIGINT
+) DISTSTYLE KEY DISTKEY (account_id)
+COMPOUND SORTKEY (account_id, updated_at);
+
+GRANT ALL ON prod_alarm TO group ops;
+ALTER TABLE prod_alarm OWNER to migrator;
+
