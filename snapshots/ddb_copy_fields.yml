@@ -62,6 +62,7 @@ prod_speech_results:
   - updated
   - uuid
   - wake_id
+  - fw
 
 speech_results:
   - cmd
@@ -80,3 +81,19 @@ prod_speech_timeline:
   - account_id
   - sense_id
   - ts
+
+key_store:
+  - aes_key
+  - created_at
+  - device_id
+  - hw_version
+  - metadata
+  - note
+
+pill_key_store:
+  - aes_key
+  - created_at
+  - device_id
+  - metadata
+  - note
+
